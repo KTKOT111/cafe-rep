@@ -115,22 +115,32 @@ function CashierModal({ employee, tenantId, existingCashier, onClose, onSaved })
 
 // ── الصفحة الرئيسية HR ────────────────────────────────────────
 export default function HRPage() {
-  const { employees, orders, shifts, currentUser, upsertEmployee, deleteEmployee, platform } = useStore()
+  const { employees, orders, shifts, currentUser, upsertEmployee, deleteEmployee, platform, addExpense } = useStore()
   const { deleteCashier, toggleCashier } = useAuth()
 
   const [showEmpModal,  setShowEmpModal]  = useState(false)
   const [deleteId,      setDeleteId]      = useState(null)
   const [selectedEmp,   setSelectedEmp]   = useState(null)
-  const [cashierTarget, setCashierTarget] = useState(null)  // { employee, existing? }
-  const [deleteConfig,  setDeleteConfig]  = useState(null)  // { type: cashier|employee, ... }
+  const [cashierTarget, setCashierTarget] = useState(null)
+  const [deleteConfig,  setDeleteConfig]  = useState(null)
+  const [payrollEmp,    setPayrollEmp]    = useState(null) // موظف صرف راتبه
   const [form, setForm] = useState({ name: '', salary: '' })
 
   const tenantId = currentUser?.cafeId
   const tenant   = platform?.tenants?.find(t => t.id === tenantId)
   const cashiers = tenant?.cashiers || []
-
-  // ربط كل موظف بكاشيره إن وجد
   const getCashier = (emp) => cashiers.find(c => c.employeeId === emp.id)
+
+  // ── صرف الراتب ────────────────────────────────────────────
+  const handlePayroll = (emp) => {
+    const net = emp.salary - (emp.advances || 0) - (emp.deductions || 0)
+    const month = new Date().toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })
+    // سجّل كمصروف
+    addExpense({ description: `راتب ${emp.name} — ${month}`, amount: net, category: 'رواتب' })
+    // صفّر السلف والخصومات
+    upsertEmployee({ ...emp, advances: 0, deductions: 0 })
+    setPayrollEmp(null)
+  }
 
   const handleSaveEmp = (e) => {
     e.preventDefault()
@@ -167,6 +177,7 @@ export default function HRPage() {
           { label: 'الاسم' }, { label: 'الراتب' }, { label: 'سلفة' }, { label: 'خصم' },
           { label: 'الصافي', center: true }, { label: 'المبيعات', center: true },
           { label: 'صلاحية كاشير', center: true },
+          { label: 'صرف راتب', center: true },
           { label: 'تقرير', center: true }, { label: 'حذف', center: true }
         ]}
         empty={!employees.length ? 'لا يوجد موظفون مسجلون' : null}
@@ -237,6 +248,14 @@ export default function HRPage() {
                     <Shield size={12}/> تعيين كاشير
                   </button>
                 )}
+              </td>
+
+              <td className="p-4 text-center">
+                {/* صرف الراتب */}
+                <button onClick={() => setPayrollEmp(emp)}
+                  className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 mx-auto transition-colors">
+                  💰 صرف
+                </button>
               </td>
 
               <td className="p-4 text-center">
@@ -375,6 +394,45 @@ export default function HRPage() {
           onSaved={() => setCashierTarget(null)}
         />
       )}
+
+      {/* ── تأكيد صرف الراتب ─────────────────────────────── */}
+      {payrollEmp && (() => {
+        const net = payrollEmp.salary - (payrollEmp.advances || 0) - (payrollEmp.deductions || 0)
+        return (
+          <Modal title="صرف الراتب الشهري" onClose={() => setPayrollEmp(null)} size="sm">
+            <div className="space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 space-y-2">
+                <div className="flex justify-between font-bold text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">الراتب الأساسي</span>
+                  <span>{payrollEmp.salary} ج</span>
+                </div>
+                {(payrollEmp.advances || 0) > 0 && (
+                  <div className="flex justify-between font-bold text-sm text-amber-600">
+                    <span>سلف</span>
+                    <span>- {payrollEmp.advances} ج</span>
+                  </div>
+                )}
+                {(payrollEmp.deductions || 0) > 0 && (
+                  <div className="flex justify-between font-bold text-sm text-rose-600">
+                    <span>خصومات</span>
+                    <span>- {payrollEmp.deductions} ج</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-black text-base border-t border-slate-200 dark:border-slate-700 pt-2 text-emerald-600">
+                  <span>الصافي المستحق</span>
+                  <span>{net} ج</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 font-bold text-center">
+                سيُسجَّل كمصروف في المصروفات وتُصفَّر السلف والخصومات
+              </p>
+              <Btn onClick={() => handlePayroll(payrollEmp)} className="w-full justify-center py-4 text-base">
+                ✅ تأكيد صرف {net} ج لـ {payrollEmp.name}
+              </Btn>
+            </div>
+          </Modal>
+        )
+      })()}
 
       {/* ── تأكيد الحذف ──────────────────────────────────── */}
       {deleteConfig && (

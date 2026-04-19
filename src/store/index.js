@@ -99,7 +99,7 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Sync ─────────────────────────────────────────────────
-  sync: () => { debouncedSync(() => get().syncNow()) },
+  sync: (_partial) => { debouncedSync(() => get().syncNow()) },
 
   syncNow: () => {
     const state = get()
@@ -255,7 +255,21 @@ export const useStore = create((set, get) => ({
       ? { ...s, status: 'closed', endTime: new Date().toLocaleString('ar-EG'), actualCash, totalSales }
       : s)
     set({ shifts: next })
-    get().sync({ shifts: next })
+    get().sync()
+  },
+
+  // ── ترحيل الطاولات المفتوحة للشيفت الجديد ────────────────
+  transferTables: (fromShiftId, toShiftId) => {
+    // الطاولات المعلقة (activeTableOrders) تبقى كما هي
+    // بس نسجل في الشيفت الجديد إنه استلم طاولات مرحّلة
+    const { shifts } = get()
+    const next = shifts.map(s =>
+      s.id === toShiftId
+        ? { ...s, transferredFrom: fromShiftId }
+        : s
+    )
+    set({ shifts: next })
+    get().sync()
   },
 
   // ── Orders / POS ─────────────────────────────────────────
@@ -340,12 +354,12 @@ export const useStore = create((set, get) => ({
     const device      = psDevices.find(d => d.id === session.deviceId)
     const durationMin = Math.ceil((Date.now() - session.startTime) / 60000)
 
-    // تقريب لأقرب 15 دقيقة — كل 15 دقيقة = ربع تعريفة الساعة
-    // مثال: 13 دقيقة → 15 دقيقة (ربع ساعة)، 28 دقيقة → 30 دقيقة (نص ساعة)
-    const quarterUnits  = Math.ceil(durationMin / 15)          // عدد الأرباع
+    // تقريب لأقرب 15 دقيقة — كل 5 دقائق = 1/12 من تعريفة الساعة
+    // مثال: 6 دقائق → 10 دقائق، 11 دقيقة → 15 دقيقة
+    const quarterUnits  = Math.ceil(durationMin / 5)          // عدد وحدات 5 دقائق
     const hourlyRate    = device?.hourlyRate || 0
-    const cost          = (quarterUnits * (hourlyRate / 4))     // كل ربع = hourlyRate ÷ 4
-    const billedMin     = quarterUnits * 15                     // الوقت المحسوب فعلياً
+    const cost          = (quarterUnits * (hourlyRate / 12))     // كل 5 دقائق = hourlyRate ÷ 12
+    const billedMin     = quarterUnits * 5                     // الوقت المحسوب فعلياً
 
     const ended = {
       ...session,

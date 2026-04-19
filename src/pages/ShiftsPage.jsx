@@ -1,25 +1,64 @@
-import { ClipboardList, Users, Play, Power } from 'lucide-react'
+import { useState } from 'react'
+import { ClipboardList, Users, Play, Power, AlertTriangle, ArrowLeftRight } from 'lucide-react'
 import { useStore } from '../store'
 import { useAuth } from '../hooks/useAuth'
-import { DataTable, Badge, PageHeader } from '../components/UI'
+import { DataTable, Badge, PageHeader, Modal, Btn } from '../components/UI'
 
 export default function ShiftsPage() {
-  const { shifts, orders, currentUser, openShift, closeShift } = useStore()
+  const { shifts, orders, activeTableOrders, tables, currentUser,
+          openShift, closeShift } = useStore()
   const { logout } = useAuth()
 
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [pendingClose, setPendingClose] = useState(null) // { shiftId, actualCash }
+
   const activeShift = shifts.find(s => s.status === 'open' && s.cashierName === currentUser?.displayName)
+
+  // الطاولات المفتوحة (عندها طلبات معلقة)
+  const openTables = Object.entries(activeTableOrders)
+    .filter(([, items]) => Array.isArray(items) && items.length > 0)
+    .map(([tableId, items]) => {
+      const table = tables.find(t => t.id === tableId)
+      return { tableId, name: table?.name || tableId, items }
+    })
 
   const handleOpenShift = (e) => {
     e.preventDefault()
     const cash = parseFloat(e.target.startingCash.value) || 0
-    openShift(currentUser.displayName, cash)
+    const newShift = openShift(currentUser.displayName, cash)
+    // لو في شيفت سابق مرحّل، اربطه بالشيفت الجديد
     e.target.reset()
   }
 
   const handleCloseShift = (e) => {
     e.preventDefault()
     const actual = parseFloat(e.target.actualCash.value) || 0
-    closeShift(activeShift.id, actual)
+
+    if (openTables.length > 0) {
+      // في طاولات مفتوحة — اعرض نافذة الترحيل
+      setPendingClose({ shiftId: activeShift.id, actualCash: actual })
+      setShowTransfer(true)
+    } else {
+      // مفيش طاولات — أغلق مباشرة
+      closeShift(activeShift.id, actual)
+      logout()
+    }
+  }
+
+  const confirmTransferAndClose = () => {
+    // أغلق الشيفت مع الطاولات المرحّلة
+    closeShift(pendingClose.shiftId, pendingClose.actualCash)
+    setShowTransfer(false)
+    setPendingClose(null)
+    // الطاولات (activeTableOrders) بتفضل موجودة تلقائياً للكاشير الجديد
+    logout()
+  }
+
+  const confirmCloseForce = () => {
+    // أغلق بدون ترحيل — الطاولات تفضل معلقة بس مش مرتبطة بشيفت
+    closeShift(pendingClose.shiftId, pendingClose.actualCash)
+    setShowTransfer(false)
+    setPendingClose(null)
     logout()
   }
 
@@ -27,12 +66,34 @@ export default function ShiftsPage() {
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
       <PageHeader icon={<ClipboardList size={28} />} title="سجل الورديات" />
 
-      {/* Open/Close shift for cashier */}
+      {/* ── Open/Close shift for cashier ── */}
       {currentUser?.role === 'cashier' && (
         <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
           {!activeShift ? (
             <form onSubmit={handleOpenShift} className="max-w-sm">
-              <h3 className="font-black text-lg text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Play size={18} className="text-emerald-500" /> فتح وردية جديدة</h3>
+              <h3 className="font-black text-lg text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <Play size={18} className="text-emerald-500" /> فتح وردية جديدة
+              </h3>
+
+              {/* تنبيه لو في طاولات مرحّلة من الشيفت السابق */}
+              {openTables.length > 0 && (
+                <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
+                  <p className="font-black text-amber-800 dark:text-amber-400 text-sm flex items-center gap-2">
+                    <ArrowLeftRight size={16} /> {openTables.length} طاولة مرحّلة من الشيفت السابق
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {openTables.map(t => (
+                      <p key={t.tableId} className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                        • {t.name} — {t.items.length} صنف
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2 font-bold">
+                    هذه الطاولات ستظهر في نقطة البيع عند فتح الوردية
+                  </p>
+                </div>
+              )}
+
               <div className="mb-4">
                 <label className="block text-sm font-black mb-2 text-slate-700 dark:text-slate-300">العهدة (مبلغ الدرج)</label>
                 <input required name="startingCash" type="number" min="0" step="any" placeholder="0.00"
@@ -44,7 +105,29 @@ export default function ShiftsPage() {
             </form>
           ) : (
             <form onSubmit={handleCloseShift} className="max-w-sm">
-              <h3 className="font-black text-lg text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Power size={18} className="text-rose-500" /> تقفيل الوردية</h3>
+              <h3 className="font-black text-lg text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <Power size={18} className="text-rose-500" /> تقفيل الوردية
+              </h3>
+
+              {/* تحذير لو في طاولات مفتوحة */}
+              {openTables.length > 0 && (
+                <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
+                  <p className="font-black text-amber-800 dark:text-amber-400 text-sm flex items-center gap-2">
+                    <AlertTriangle size={16} /> {openTables.length} طاولة مفتوحة
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {openTables.map(t => (
+                      <p key={t.tableId} className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                        • {t.name} — {t.items.length} صنف
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2 font-bold">
+                    ستُرحَّل للشيفت القادم عند الإغلاق
+                  </p>
+                </div>
+              )}
+
               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl mb-4 border border-indigo-100 dark:border-indigo-800">
                 <div className="flex justify-between text-sm font-bold text-indigo-800 dark:text-indigo-300 mb-2">
                   <span>العهدة المستلمة</span><span>{activeShift.startingCash} ج</span>
@@ -60,14 +143,14 @@ export default function ShiftsPage() {
                   className="w-full p-4 bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-center font-black text-2xl focus:outline-none focus:border-rose-500 text-slate-800 dark:text-white" />
               </div>
               <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg transition-colors">
-                <Power size={18} /> تأكيد التقفيل والخروج
+                <Power size={18} /> {openTables.length > 0 ? 'تقفيل وترحيل الطاولات' : 'تأكيد التقفيل والخروج'}
               </button>
             </form>
           )}
         </div>
       )}
 
-      {/* Shifts table */}
+      {/* ── Shifts table ── */}
       <DataTable
         headers={[
           { label: 'الموظف' }, { label: 'البداية' }, { label: 'النهاية' },
@@ -80,11 +163,17 @@ export default function ShiftsPage() {
           const shiftSales = orders.filter(o => o.shiftId === shift.id).reduce((s, o) => s + o.total, 0)
           const expected   = (shift.startingCash || 0) + shiftSales
           const variance   = shift.status === 'closed' ? (shift.actualCash || 0) - expected : null
-
           return (
             <tr key={shift.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-sm">
-              <td className="p-4 font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <Users size={14} className="text-indigo-400 shrink-0" /> {shift.cashierName}
+              <td className="p-4 font-bold text-slate-800 dark:text-white">
+                <div className="flex items-center gap-2">
+                  <Users size={14} className="text-indigo-400 shrink-0" /> {shift.cashierName}
+                  {shift.transferredFrom && (
+                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                      <ArrowLeftRight size={8}/> مرحّل
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="p-4 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{shift.startTime}</td>
               <td className="p-4 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{shift.endTime || '—'}</td>
@@ -96,8 +185,7 @@ export default function ShiftsPage() {
                   ? <Badge color={variance < 0 ? 'rose' : variance > 0 ? 'emerald' : 'slate'}>
                       {variance < 0 ? `عجز ${Math.abs(variance).toFixed(2)}` : variance > 0 ? `زيادة ${variance.toFixed(2)}` : 'مضبوط'}
                     </Badge>
-                  : '—'
-                }
+                  : '—'}
               </td>
               <td className="p-4 text-center">
                 <Badge color={shift.status === 'open' ? 'amber' : 'slate'}>
@@ -108,6 +196,46 @@ export default function ShiftsPage() {
           )
         })}
       </DataTable>
+
+      {/* ── Transfer modal ── */}
+      {showTransfer && (
+        <Modal title="⚠️ طاولات مفتوحة" onClose={() => { setShowTransfer(false); setPendingClose(null) }}>
+          <div className="space-y-4">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
+              <p className="font-black text-amber-800 dark:text-amber-400 mb-3">
+                {openTables.length} طاولة لا تزال مفتوحة:
+              </p>
+              <div className="space-y-2">
+                {openTables.map(t => (
+                  <div key={t.tableId} className="flex justify-between text-sm font-bold text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-amber-100 dark:border-amber-800">
+                    <span>{t.name}</span>
+                    <span>{t.items.length} صنف — {t.items.reduce((s,i) => s + i.price * i.quantity, 0).toFixed(0)} ج</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-sm font-bold text-slate-600 dark:text-slate-400">
+              اختر ماذا تريد بهذه الطاولات:
+            </p>
+
+            {/* ترحيل — الأفضل */}
+            <button onClick={confirmTransferAndClose}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2 transition-colors">
+              <ArrowLeftRight size={18} /> ترحيل للشيفت القادم والخروج
+            </button>
+            <p className="text-xs text-slate-400 text-center font-bold -mt-2">
+              الطاولات ستظهر للكاشير التالي عند فتح وردية جديدة
+            </p>
+
+            {/* إغلاق بدون ترحيل */}
+            <button onClick={confirmCloseForce}
+              className="w-full bg-slate-200 dark:bg-slate-700 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-slate-700 dark:text-slate-300 hover:text-rose-600 py-3 rounded-2xl font-bold text-sm transition-colors">
+              إغلاق بدون ترحيل (تجاهل الطاولات)
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

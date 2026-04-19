@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { ShoppingCart, Plus, Minus, X, Banknote, Save, Package, Coffee,
          Armchair, RefreshCw, Receipt, Gamepad2, Tag, Play, Power, Clock, Gift } from 'lucide-react'
 import { useStore } from '../store'
-import { printReceipt } from '../lib/pdf'
+import { printReceipt, printBarista } from '../lib/pdf'
 import { Modal } from '../components/UI'
 
 function getOfferPrice(product, offers) {
@@ -236,6 +236,10 @@ export default function POSPage() {
     if (currentUser?.role === 'cashier' && !activeShift) { alert('افتح شيفت أولاً'); return }
     const order = placeOrder(cart, { orderType, tableId: activeTable?.id, tableName: activeTable?.name, shiftId: activeShift?.id, cashierName: currentUser?.displayName, discountType, discountValue: discountAmount > 0 ? dv : 0 })
     setLastOrder(order)
+    // طباعة الباريستا بس للتيك أواي — الصالة بتطبع عند التعليق
+    if (orderType === 'takeaway') {
+      printBarista({ order, tableName: null })
+    }
     setCart([]); setActiveTable(null); setMode('takeaway'); setDiscountVal(''); setCartOpen(false)
   }
 
@@ -243,6 +247,16 @@ export default function POSPage() {
     if (!activeTable || !cart.length || holding) return
     setHolding(true)
     await holdTable(activeTable.id, cart)
+    // طباعة الباريستا عند تعليق الطاولة
+    printBarista({
+      order: {
+        id:          `hold_${Date.now()}`,
+        items:       cart,
+        note:        `صالة — ${activeTable.name}`,
+        cashierName: currentUser?.displayName,
+      },
+      tableName: activeTable.name
+    })
     setHolding(false)
     setCart([]); setActiveTable(null); setMode('takeaway'); setCartOpen(false)
   }

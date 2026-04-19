@@ -121,12 +121,48 @@ export function printReceipt({ order, cafeName, cashierName }) {
     <div class="sep"></div>
     <div class="row"><span>المجموع</span><span>${order.subtotal?.toFixed(2)} ج</span></div>
     ${order.discountAmount > 0 ? `<div class="row" style="color:#16a34a"><span>خصم</span><span>-${order.discountAmount.toFixed(2)} ج</span></div>` : ''}
+    ${order.service > 0 ? `<div class="row" style="color:#d97706"><span>خدمة 10%</span><span>${order.service.toFixed(2)} ج</span></div>` : ''}
     ${order.tax > 0 ? `<div class="row"><span>ضريبة 14%</span><span>${order.tax.toFixed(2)} ج</span></div>` : ''}
     <div class="sep"></div>
     <div class="row total"><span>الإجمالي</span><span>${order.total.toFixed(2)} ج</span></div>
     <div class="sep" style="margin-top:12px"></div>
     <div class="center" style="font-size:10px;color:#666">الكاشير: ${cashierName}</div>
     <div class="center" style="font-size:10px;color:#666;margin-top:4px">شكراً لزيارتكم 🌟</div>
+    ${PRINT_SCRIPT}
+  </body></html>`)
+}
+
+// ── طباعة تذكرة الباريستا ──────────────────────────────────
+export function printBarista({ order, tableName }) {
+  const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+  printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Cairo',monospace;width:80mm;padding:16px;font-size:13px;direction:rtl}
+      h1{text-align:center;font-size:22px;font-weight:900;margin-bottom:6px;letter-spacing:1px}
+      .meta{text-align:center;font-size:11px;color:#555;margin-bottom:10px}
+      .sep{border-top:2px dashed #000;margin:10px 0}
+      .item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dotted #ccc;font-size:15px;font-weight:700}
+      .qty{background:#1e293b;color:#fff;border-radius:6px;padding:2px 8px;font-size:14px;font-weight:900;min-width:28px;text-align:center}
+      .note{text-align:center;font-size:11px;color:#888;margin-top:10px}
+      @media print{body{width:80mm}}
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
+  </head><body>
+    <h1>🧑‍🍳 طلب باريستا</h1>
+    <div class="meta">
+      ${tableName ? `<strong>${tableName}</strong> &nbsp;|&nbsp;` : ''}
+      ${order.note || 'تيك أواي'} &nbsp;|&nbsp; ${time}
+      <br/>رقم: #${String(order.id).slice(-4)}
+    </div>
+    <div class="sep"></div>
+    ${(order.items || []).map(i => `
+      <div class="item">
+        <span>${i.name}</span>
+        <span class="qty">${i.quantity}</span>
+      </div>`).join('')}
+    <div class="sep"></div>
+    <div class="note">الكاشير: ${order.cashierName || ''}</div>
     ${PRINT_SCRIPT}
   </body></html>`)
 }

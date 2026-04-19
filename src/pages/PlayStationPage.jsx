@@ -3,16 +3,16 @@ import { Gamepad2, Plus, Trash2, Play, Power, Clock } from 'lucide-react'
 import { useStore } from '../store'
 import { Modal, ConfirmDelete, PageHeader, Input, Btn, DataTable, Badge } from '../components/UI'
 
-// ── حساب التكلفة بتقريب لأقرب 15 دقيقة ──────────────────
+// ── حساب التكلفة بتقريب لأقرب 5 دقائق ──────────────────
 function calcCost(startTime, hourlyRate) {
   const min          = Math.ceil((Date.now() - startTime) / 60000)
-  const quarterUnits = Math.ceil(min / 15)   // عدد الأرباع
-  return (quarterUnits * (hourlyRate / 4))
+  const quarterUnits = Math.ceil(min / 5)   // عدد وحدات الـ 5 دقائق
+  return (quarterUnits * (hourlyRate / 12))
 }
 
 function calcBilledMin(startTime) {
   const min = Math.ceil((Date.now() - startTime) / 60000)
-  return Math.ceil(min / 15) * 15
+  return Math.ceil(min / 5) * 5
 }
 
 // Live timer for active sessions
@@ -26,8 +26,8 @@ function LiveTimer({ startTime, hourlyRate }) {
   const actualMin = Math.floor(elapsed / 60)
   const hrs       = Math.floor(actualMin / 60)
   const rem       = actualMin % 60
-  const billedMin = Math.ceil(Math.max(actualMin, 1) / 15) * 15
-  const cost      = (Math.ceil(Math.max(actualMin, 1) / 15)) * (hourlyRate / 4)
+  const billedMin = Math.ceil(Math.max(actualMin, 1) / 5) * 5
+  const cost      = (Math.ceil(Math.max(actualMin, 1) / 5)) * (hourlyRate / 12)
 
   return (
     <div className="text-center">
@@ -96,7 +96,7 @@ export default function PlayStationPage() {
                     <h3 className="font-black text-xl text-slate-800 dark:text-white">{device.name}</h3>
                     <p className="text-indigo-600 dark:text-indigo-400 font-bold text-sm mt-0.5 flex items-center gap-1">
                       <Clock size={12} /> {device.hourlyRate} ج / ساعة
-                      <span className="text-slate-400 font-bold mr-1">· تحصيل كل 15 دقيقة</span>
+                      <span className="text-slate-400 font-bold mr-1">· تحصيل كل 5 دقائق</span>
                     </p>
                   </div>
                   <span className={`px-3 py-1.5 rounded-xl text-xs font-black ${session ? 'bg-emerald-100 text-emerald-700 animate-pulse' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'}`}>
@@ -156,7 +156,7 @@ export default function PlayStationPage() {
                 <td className="p-4 text-center">
                   <div className="flex flex-col items-center gap-0.5">
                     <Badge color="slate">{s.durationMin} د فعلي</Badge>
-                    <Badge color="indigo">{s.billedMin ?? Math.ceil(s.durationMin / 15) * 15} د محسوب</Badge>
+                    <Badge color="indigo">{s.billedMin ?? Math.ceil(s.durationMin / 5) * 5} د محسوب</Badge>
                   </div>
                 </td>
                 <td className="p-4 text-center font-black text-indigo-600 dark:text-indigo-400">{s.cost} ج</td>
