@@ -66,6 +66,7 @@ export const useStore = create((set, get) => ({
   psDevices:         [],
   psSessions:        [],
   isTaxEnabled:      false,
+  isServiceEnabled:  false,   // رسوم خدمة 10%
 
   setCafeData: (data) => set({
     products:          data.products?.length    ? data.products          : DEFAULT_PRODUCTS,
@@ -79,15 +80,23 @@ export const useStore = create((set, get) => ({
     offers:            data.offers              || [],
     psDevices:         data.psDevices           || [],
     psSessions:        data.psSessions          || [],
-    isTaxEnabled:      data.isTaxEnabled        ?? false
+    isTaxEnabled:      data.isTaxEnabled        ?? false,
+    isServiceEnabled:  data.isServiceEnabled    ?? false,
   }),
 
-  resetCafeData: () => set({
-    products: DEFAULT_PRODUCTS, rawMaterials: DEFAULT_RAW_MATERIALS, employees: [],
-    expenses: [], tables: [], shifts: [], orders: [],
-    activeTableOrders: {}, offers: [], psDevices: [], psSessions: [],
-    isTaxEnabled: false
-  }),
+  // ── Reset — يحفظ المخزون والمنتجات والموظفين ──────────────
+  resetCafeData: () => {
+    const { rawMaterials, products, employees, psDevices, tables, offers } = get()
+    set({
+      // محفوظة: المخزون والمنتجات والموظفين والأجهزة والطاولات والعروض
+      rawMaterials, products, employees, psDevices, tables, offers,
+      // تصفير: الطلبات والورديات والمصروفات والجلسات
+      expenses: [], shifts: [], orders: [],
+      activeTableOrders: {}, psSessions: [],
+      isTaxEnabled: false, isServiceEnabled: false,
+    })
+    get().sync()
+  },
 
   // ── Sync ─────────────────────────────────────────────────
   sync: () => { debouncedSync(() => get().syncNow()) },
@@ -111,6 +120,7 @@ export const useStore = create((set, get) => ({
       psDevices:         state.psDevices,
       psSessions:        state.psSessions,
       isTaxEnabled:      state.isTaxEnabled,
+      isServiceEnabled:  state.isServiceEnabled,
     }
 
     saveCafe(cafeId, payload)
@@ -221,7 +231,12 @@ export const useStore = create((set, get) => ({
   toggleTax: () => {
     const next = !get().isTaxEnabled
     set({ isTaxEnabled: next })
-    get().sync({ isTaxEnabled: next })
+    get().sync()
+  },
+  toggleService: () => {
+    const next = !get().isServiceEnabled
+    set({ isServiceEnabled: next })
+    get().sync()
   },
 
   // ── Shifts ────────────────────────────────────────────────
@@ -245,11 +260,11 @@ export const useStore = create((set, get) => ({
 
   // ── Orders / POS ─────────────────────────────────────────
   placeOrder: (cart, options) => {
-    const { orders, rawMaterials, products, activeTableOrders, isTaxEnabled } = get()
+    const { orders, rawMaterials, products, activeTableOrders, isTaxEnabled, isServiceEnabled } = get()
     const { orderType, tableId, shiftId, cashierName, discountType, discountValue, tableName } = options
-    const TAX_RATE = 0.14
+    const TAX_RATE     = 0.14
+    const SERVICE_RATE = 0.10
 
-    // حساب المجاميع
     const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0)
     let discountAmount = 0
     if (discountValue > 0) {
@@ -258,8 +273,9 @@ export const useStore = create((set, get) => ({
         : Math.min(subtotal, discountValue)
     }
     const afterDiscount = subtotal - discountAmount
-    const tax   = isTaxEnabled ? afterDiscount * TAX_RATE : 0
-    const total = afterDiscount + tax
+    const service = isServiceEnabled ? afterDiscount * SERVICE_RATE : 0
+    const tax     = isTaxEnabled     ? (afterDiscount + service) * TAX_RATE : 0
+    const total   = afterDiscount + service + tax
 
     // خصم من المخزون
     const newMaterials = rawMaterials.map(rm => ({ ...rm }))
@@ -275,7 +291,7 @@ export const useStore = create((set, get) => ({
     const order = {
       id: `ord_${Date.now()}`,
       items: cart, subtotal, discountAmount, discountType, discountValue,
-      tax, total, shiftId, cashierName,
+      service, tax, total, shiftId, cashierName,
       note: orderType === 'takeaway' ? 'تيك أواي' : `صالة — ${tableName}`,
       date: new Date().toLocaleString('ar-EG'),
       timestamp: Date.now()
