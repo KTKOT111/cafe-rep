@@ -2,11 +2,11 @@ import { Wifi, WifiOff, RefreshCw, AlertCircle, Bell, AlertTriangle, RotateCcw }
 import { useStore, selectLowStock, selectExpiringProducts } from '../store'
 
 export default function StatusBar({ onNavigate }) {
-  const { isOnline, syncStatus, currentUser, _syncBuffer } = useStore()
+  const { isOnline, syncStatus, currentUser } = useStore()
   const lowStock = useStore(selectLowStock(50))
   const { expired, nearExpiry } = useStore(selectExpiringProducts)
 
-  const hasPending = currentUser?.cafeId && Object.keys(_syncBuffer || {}).length > 0
+  const hasPending = syncStatus === 'saving'
 
   const barColor =
     !isOnline         ? 'bg-rose-600' :
