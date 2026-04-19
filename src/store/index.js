@@ -20,6 +20,13 @@ const DEFAULT_PLATFORM = {
   ]
 }
 
+// ─── Debounce timer (outside store — non-serializable) ────
+let _syncTimer = null
+function debouncedSync(fn, delay = 400) {
+  if (_syncTimer) clearTimeout(_syncTimer)
+  _syncTimer = setTimeout(() => { _syncTimer = null; fn() }, delay)
+}
+
 // ─── Store ────────────────────────────────────────────────
 export const useStore = create((set, get) => ({
 
@@ -82,49 +89,45 @@ export const useStore = create((set, get) => ({
     isTaxEnabled: false
   }),
 
-  // ── Sync — debounced 300ms ────────────────────────────────
-  _syncTimer:  null,
-  _syncBuffer: {},
+  // ── Sync ─────────────────────────────────────────────────
+  sync: () => { debouncedSync(() => get().syncNow()) },
 
-  sync: (partial) => {
-    const { currentUser } = get()
-    if (!currentUser?.cafeId) return
+  syncNow: () => {
+    const state = get()
+    if (!state.currentUser?.cafeId) return
+    const cafeId = state.currentUser.cafeId
+    set({ syncStatus: 'saving' })
 
-    const cafeId = currentUser.cafeId
-    set(s => ({ _syncBuffer: { ...s._syncBuffer, ...partial }, syncStatus: 'saving' }))
+    const payload = {
+      products:          state.products,
+      rawMaterials:      state.rawMaterials,
+      employees:         state.employees,
+      expenses:          state.expenses,
+      tables:            state.tables,
+      shifts:            state.shifts,
+      orders:            state.orders,
+      activeTableOrders: state.activeTableOrders,
+      offers:            state.offers,
+      psDevices:         state.psDevices,
+      psSessions:        state.psSessions,
+      isTaxEnabled:      state.isTaxEnabled,
+    }
 
-    if (get()._syncTimer) clearTimeout(get()._syncTimer)
-
-    const timer = setTimeout(async () => {
-      const buffer = get()._syncBuffer
-      if (!Object.keys(buffer).length) return
-      set({ _syncBuffer: {}, _syncTimer: null })
-
-      // محاولة مع retry مرة واحدة
-      const doSave = async () => {
-        await saveCafe(cafeId, buffer)
-      }
-
-      try {
-        await doSave()
+    saveCafe(cafeId, payload)
+      .then(() => {
         set({ syncStatus: 'saved' })
         setTimeout(() => set(s => s.syncStatus === 'saved' ? { syncStatus: 'idle' } : {}), 2000)
-      } catch (e1) {
-        // retry بعد ثانية واحدة
-        setTimeout(async () => {
-          try {
-            await doSave()
-            set({ syncStatus: 'saved' })
-            setTimeout(() => set(s => s.syncStatus === 'saved' ? { syncStatus: 'idle' } : {}), 2000)
-          } catch (e2) {
-            console.error('Sync failed:', e2.code, e2.message)
-            set(s => ({ syncStatus: 'error', _syncBuffer: { ...buffer, ...s._syncBuffer } }))
-          }
-        }, 1000)
-      }
-    }, 300)
-
-    set({ _syncTimer: timer })
+      })
+      .catch(e => {
+        console.error('Sync error:', e.code, e.message)
+        set({ syncStatus: 'error' })
+        // retry after 3s
+        setTimeout(() => {
+          saveCafe(cafeId, payload)
+            .then(() => set({ syncStatus: 'saved' }))
+            .catch(e2 => console.error('Retry failed:', e2.code))
+        }, 3000)
+      })
   },
 
   // ── Products ─────────────────────────────────────────────
