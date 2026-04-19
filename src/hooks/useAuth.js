@@ -6,7 +6,8 @@ import {
 } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 import { useStore } from '../store'
-import { savePlatform } from '../lib/firestore'
+import { savePlatform, PLATFORM_DOC } from '../lib/firestore'
+import { getDoc } from 'firebase/firestore'
 
 // ─── SHA-256 ──────────────────────────────────────────────
 async function hashPassword(password) {
@@ -29,6 +30,15 @@ function getLatestPlatform() {
   return useStore.getState().platform
 }
 
+// ─── جيب الـ platform من Firestore مباشرة ────────────────
+async function fetchPlatform() {
+  try {
+    const snap = await getDoc(PLATFORM_DOC())
+    if (snap.exists()) return snap.data()
+  } catch {}
+  return getLatestPlatform()
+}
+
 const OWNER_EMAIL = import.meta.env.VITE_OWNER_EMAIL || 'owner@coffeeerp.app'
 
 export function useAuth() {
@@ -48,27 +58,19 @@ export function useAuth() {
     }
 
     try {
-      // ── 1. حاول Firebase Auth أولاً (Owner + Admins) ──────
-      // لو نجح — يبقى owner أو admin
+      // ── 1. جرب Firebase Auth (Owner + Admins) ─────────────
       let firebaseCred = null
       try {
         firebaseCred = await signInWithEmailAndPassword(auth, em, password)
       } catch (authErr) {
-        // لو فشل Firebase Auth — ابحث في الكاشيرين
-        if (authErr.code === 'auth/user-not-found' ||
-            authErr.code === 'auth/invalid-credential' ||
-            authErr.code === 'auth/wrong-password') {
+        if (['auth/user-not-found','auth/invalid-credential','auth/wrong-password'].includes(authErr.code)) {
           firebaseCred = null
         } else {
-          // خطأ تاني (network, etc)
           throw authErr
         }
       }
 
       if (firebaseCred) {
-        // Firebase Auth نجح — حدد الدور
-        const platform = getLatestPlatform()
-
         // Owner
         if (em === OWNER_EMAIL) {
           setCurrentUser({
@@ -79,10 +81,16 @@ export function useAuth() {
           return true
         }
 
-        // Admin — ابحث في الـ tenants
+        // Admin — اجيب أحدث platform من Firestore مباشرة
+        const platform = await fetchPlatform()
+
+        // حدّث الـ store بالبيانات الجديدة
+        if (platform) useStore.getState().setPlatform(platform)
+
         const tenant = (platform?.tenants || []).find(
           t => t.adminEmail?.toLowerCase() === em
         )
+
         if (tenant) {
           if (tenant.status !== 'active') {
             await fbSignOut(auth); setError('اشتراك الكافيه موقوف.'); return false
@@ -98,17 +106,16 @@ export function useAuth() {
           return true
         }
 
-        // Firebase Auth نجح بس الإيميل مش في tenants ولا owner
-        // ممكن يكون admin جديد — نسمح له كـ super_admin مؤقتاً
-        // أو نرجع خطأ
+        // Firebase Auth نجح بس مش في tenants
         await fbSignOut(auth)
         setError('هذا الحساب غير مسجل في النظام. تواصل مع مالك المنصة.')
         return false
       }
 
-      // ── 2. Cashier — بدون Firebase Auth ──────────────────
+      // ── 2. Cashier ────────────────────────────────────────
       const hashed   = await hashPassword(password)
-      const platform = getLatestPlatform()
+      const platform = await fetchPlatform()
+      if (platform) useStore.getState().setPlatform(platform)
 
       for (const t of (platform?.tenants || [])) {
         const found = (t.cashiers || []).find(c =>
@@ -121,7 +128,6 @@ export function useAuth() {
           if (t.subscriptionEnds && new Date(t.subscriptionEnds) < new Date()) {
             setError('انتهى اشتراك الكافيه.'); return false
           }
-          // Anonymous sign-in للوصول لـ Firestore
           await signInAnonymously(auth)
           setCurrentUser({
             uid: found.id, email: em, role: 'cashier',
