@@ -1,17 +1,30 @@
 import { db } from './firebase'
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'
 
+// ─── Clean undefined values (Firestore rejects them) ─────
+function clean(obj) {
+  if (Array.isArray(obj)) return obj.map(clean)
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, clean(v)])
+    )
+  }
+  return obj
+}
+
 // ─── Platform ────────────────────────────────────────────
-export const PLATFORM_DOC  = () => doc(db, 'erp_platform', 'config')
+export const PLATFORM_DOC      = () => doc(db, 'erp_platform', 'config')
 export const subscribePlatform = (cb, errCb) => onSnapshot(PLATFORM_DOC(), cb, errCb)
 export const savePlatform      = (data) =>
-  setDoc(PLATFORM_DOC(), { ...data, updatedAt: Date.now() }, { merge: true })
+  setDoc(PLATFORM_DOC(), clean({ ...data, updatedAt: Date.now() }), { merge: true })
 
 // ─── Cafe data ────────────────────────────────────────────
 export const CAFE_DOC      = (cafeId) => doc(db, 'erp_cafes', cafeId)
 export const subscribeCafe = (cafeId, cb, errCb) => onSnapshot(CAFE_DOC(cafeId), cb, errCb)
 export const saveCafe      = (cafeId, data) =>
-  setDoc(CAFE_DOC(cafeId), { ...data, updatedAt: Date.now() }, { merge: true })
+  setDoc(CAFE_DOC(cafeId), clean({ ...data, updatedAt: Date.now() }), { merge: true })
 
 /*
 ══════════════════════════════════════════════════════════════
