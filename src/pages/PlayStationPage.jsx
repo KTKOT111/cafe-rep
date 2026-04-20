@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Gamepad2, Plus, Trash2, Play, Power, Clock } from 'lucide-react'
 import { useStore } from '../store'
 import { Modal, ConfirmDelete, PageHeader, Input, Btn, DataTable, Badge } from '../components/UI'
-import { printReceipt } from '../lib/pdf'
+import { printPsReceipt } from '../lib/pdf'
 
 // ── حساب التكلفة بتقريب لأقرب 5 دقائق ──────────────────
 function calcCost(startTime, hourlyRate) {
@@ -70,24 +70,14 @@ export default function PlayStationPage() {
   const getActiveSession = (deviceId) => psSessions.find(s => s.deviceId === deviceId && s.status === 'active')
 
   const handleEndSession = (session, device) => {
+    const endTime = Date.now()
     endPsSession(session.id)
-    // طباعة الفاتورة بعد إنهاء الجلسة
-    const durationMin  = Math.ceil((Date.now() - session.startTime) / 60000)
-    const units        = Math.ceil(durationMin / 5)
-    const billedMin    = units * 5
-    const cost         = units * ((device?.hourlyRate || 0) / 12)
-    const order = {
-      id:             session.id,
-      items:          [{ id: session.id, name: `${device?.name} — ${durationMin} دقيقة (محسوب: ${billedMin} د)`, price: cost, quantity: 1 }],
-      subtotal:       cost,
-      discountAmount: 0,
-      service:        0,
-      tax:            0,
-      total:          cost,
-      date:           new Date().toLocaleString('ar-EG'),
-      cashierName:    session.cashierName,
-    }
-    printReceipt({ order, cafeName: currentUser?.cafeName || '', cashierName: session.cashierName })
+    // طباعة فاتورة البلايستيشن مع وقت البداية والنهاية
+    printPsReceipt({
+      session: { ...session, endTime },
+      device,
+      cafeName: currentUser?.cafeName || '',
+    })
   }
 
   const endedSessions = [...psSessions.filter(s => s.status === 'ended')].reverse().slice(0, 30)

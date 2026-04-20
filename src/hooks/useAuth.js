@@ -106,10 +106,10 @@ export function useAuth() {
           return true
         }
 
-        // Firebase Auth نجح بس مش في tenants
+        // Firebase Auth نجح بس مش في tenants كـ admin
+        // ممكن يكون كاشير عنده Firebase account بالغلط — ادور في الكاشيرين
         await fbSignOut(auth)
-        setError('هذا الحساب غير مسجل في النظام. تواصل مع مالك المنصة.')
-        return false
+        // fall through to cashier check below
       }
 
       // ── 2. Cashier ────────────────────────────────────────

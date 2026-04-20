@@ -132,6 +132,82 @@ export function printReceipt({ order, cafeName, cashierName }) {
   </body></html>`)
 }
 
+// ── فاتورة البلايستيشن ─────────────────────────────────────
+export function printPsReceipt({ session, device, cafeName }) {
+  const durationMin = Math.ceil((session.endTime - session.startTime) / 60000)
+  const units       = Math.ceil(durationMin / 5)
+  const billedMin   = units * 5
+  const cost        = units * ((device?.hourlyRate || 0) / 12)
+
+  const startStr = new Date(session.startTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+  const endStr   = new Date(session.endTime  ).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+  const dateStr  = new Date(session.endTime  ).toLocaleDateString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+  printWindow(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Cairo',monospace;width:80mm;padding:14px;font-size:12px;direction:rtl}
+      h2{text-align:center;font-size:18px;margin-bottom:2px;font-weight:900}
+      .sub{text-align:center;font-size:11px;color:#555;margin-bottom:8px}
+      .sep{border-top:1px dashed #000;margin:8px 0}
+      .row{display:flex;justify-content:space-between;margin:4px 0;font-size:12px}
+      .label{color:#555}
+      .total{font-size:17px;font-weight:900}
+      .box{background:#f1f5f9;border-radius:8px;padding:8px 10px;margin:8px 0}
+      @media print{body{width:80mm}}
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;900&display=swap" rel="stylesheet">
+  </head><body>
+    <h2>${cafeName || 'بلايستيشن'}</h2>
+    <div class="sub">🎮 ${device?.name || 'جهاز'}</div>
+    <div class="sep"></div>
+
+    <!-- وقت البداية والنهاية -->
+    <div class="box">
+      <div class="row">
+        <span class="label">📅 التاريخ</span>
+        <span><b>${dateStr}</b></span>
+      </div>
+      <div class="row">
+        <span class="label">🕐 بداية الجلسة</span>
+        <span><b>${startStr}</b></span>
+      </div>
+      <div class="row">
+        <span class="label">🕑 نهاية الجلسة</span>
+        <span><b>${endStr}</b></span>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <!-- تفاصيل الوقت -->
+    <div class="row">
+      <span class="label">⏱ الوقت الفعلي</span>
+      <span>${durationMin} دقيقة</span>
+    </div>
+    <div class="row">
+      <span class="label">📊 الوقت المحسوب</span>
+      <span>${billedMin} دقيقة</span>
+    </div>
+    <div class="row">
+      <span class="label">💵 سعر الساعة</span>
+      <span>${device?.hourlyRate || 0} ج</span>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="row total">
+      <span>الإجمالي</span>
+      <span>${cost.toFixed(2)} ج</span>
+    </div>
+
+    <div class="sep" style="margin-top:12px"></div>
+    <div style="text-align:center;font-size:10px;color:#666">الكاشير: ${session.cashierName || ''}</div>
+    <div style="text-align:center;font-size:10px;color:#666;margin-top:4px">شكراً لزيارتكم 🎮</div>
+    ${PRINT_SCRIPT}
+  </body></html>`)
+}
+
 // ── طباعة تذكرة الباريستا ──────────────────────────────────
 export function printBarista({ order, tableName }) {
   const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
