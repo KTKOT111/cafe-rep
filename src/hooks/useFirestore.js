@@ -93,7 +93,14 @@ export function useFirestore() {
   // ── Platform subscription ─────────────────────────────────
   useEffect(() => {
     const unsub = subscribePlatform(
-      (snap) => { if (snap.exists()) setPlatform(snap.data()) },
+      (snap) => { 
+        if (snap.exists()) {
+          setPlatform(snap.data())
+        } else {
+          // Document doesn't exist yet, mark as loaded so Super Admin can create it
+          useStore.getState().setPlatformLoaded(true)
+        }
+      },
       (err)  => {
         // Permission errors are expected when not logged in
         if (err.code !== 'permission-denied') {

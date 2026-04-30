@@ -25,7 +25,7 @@ export default function SuperAdminPage() {
     setShowTenantModal(true)
   }
 
-  const handleSaveTenant = (e) => {
+  const handleSaveTenant = async (e) => {
     e.preventDefault()
     let next
     if (editTenant) {
@@ -34,8 +34,8 @@ export default function SuperAdminPage() {
       if (tenants.find(t => t.id === form.id)) { alert('كود الكافيه موجود بالفعل!'); return }
       next = [...tenants, { ...form, cashiers: [] }]
     }
-    savePlatformField({ tenants: next })
-    setShowTenantModal(false)
+    const success = await savePlatformField({ tenants: next })
+    if (success !== false) setShowTenantModal(false)
   }
 
   const toggleStatus = (id) => {
@@ -45,10 +45,10 @@ export default function SuperAdminPage() {
     savePlatformField({ tenants: next })
   }
 
-  const handleSaveSettings = (e) => {
+  const handleSaveSettings = async (e) => {
     e.preventDefault()
-    savePlatformField({ appName: appNameForm })
-    setShowSettingsModal(false)
+    const success = await savePlatformField({ appName: appNameForm })
+    if (success !== false) setShowSettingsModal(false)
   }
 
   const isExpired = (t) => t.subscriptionEnds && new Date(t.subscriptionEnds) < new Date()

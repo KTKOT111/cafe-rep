@@ -41,13 +41,19 @@ export const useStore = create((set, get) => ({
   savePlatformField: async (partial) => {
     if (!get().platformLoaded) {
       console.warn('Cannot save platform field: platform not loaded yet.')
-      return
+      alert('الرجاء الانتظار حتى يتم تحميل البيانات من السيرفر.')
+      return false
     }
     const next = { ...get().platform, ...partial }
     set({ platform: next })
     try {
       await savePlatform(next)
-    } catch (e) { console.error('Platform save error:', e) }
+      return true
+    } catch (e) { 
+      console.error('Platform save error:', e) 
+      alert('حدث خطأ أثناء الحفظ. تأكد من اتصالك بالإنترنت.')
+      return false
+    }
   },
 
   // ── Cafe data ────────────────────────────────────────────
