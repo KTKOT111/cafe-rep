@@ -7,17 +7,8 @@ const DEFAULT_PRODUCTS      = SEED_PRODUCTS
 const DEFAULT_RAW_MATERIALS = SEED_MATERIALS
 
 const DEFAULT_PLATFORM = {
-  appName: '',
-  tenants: [
-    {
-      id:                'cafe1',
-      name:              'let\'s 24',
-      status:            'active',
-      subscriptionEnds:  '2026-12-31',
-      adminEmail:        'admin@cafe1.com',
-      cashiers:          []
-    }
-  ]
+  appName: 'كوفي ERP',
+  tenants: []
 }
 
 // ─── Debounce timer (outside store — non-serializable) ────
@@ -35,17 +26,23 @@ export const useStore = create((set, get) => ({
   isDarkMode: false,
   isOnline: true,
   syncStatus: 'idle',     // idle | saving | saved | error
+  platformLoaded: false,
 
   setCurrentUser:  (u)  => set({ currentUser: u }),
   setIsDarkMode:   (v)  => set({ isDarkMode: v }),
   setIsOnline:     (v)  => set({ isOnline: v }),
   setSyncStatus:   (v)  => set({ syncStatus: v }),
+  setPlatformLoaded: (v) => set({ platformLoaded: v }),
 
   // ── Platform (Super Admin) ──────────────────────────────
   platform: DEFAULT_PLATFORM,
-  setPlatform: (data) => set({ platform: data }),
+  setPlatform: (data) => set({ platform: data, platformLoaded: true }),
 
   savePlatformField: async (partial) => {
+    if (!get().platformLoaded) {
+      console.warn('Cannot save platform field: platform not loaded yet.')
+      return
+    }
     const next = { ...get().platform, ...partial }
     set({ platform: next })
     try {

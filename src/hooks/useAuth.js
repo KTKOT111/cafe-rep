@@ -31,12 +31,14 @@ function getLatestPlatform() {
 }
 
 // ─── جيب الـ platform من Firestore مباشرة ────────────────
-async function fetchPlatform() {
+async function fetchPlatform(useFallback = true) {
   try {
     const snap = await getDoc(PLATFORM_DOC())
     if (snap.exists()) return snap.data()
-  } catch {}
-  return getLatestPlatform()
+  } catch (e) {
+    console.error('Fetch platform error:', e)
+  }
+  return useFallback ? getLatestPlatform() : null
 }
 
 const OWNER_EMAIL = import.meta.env.VITE_OWNER_EMAIL || 'owner@coffeeerp.app'
@@ -82,13 +84,14 @@ export function useAuth() {
         }
 
         // Admin — اجيب أحدث platform من Firestore مباشرة
-        const platform = await fetchPlatform()
+        // لا نستخدمFallback هنا لضمان دقة البيانات
+        const platform = await fetchPlatform(false) || await fetchPlatform(true)
 
         // حدّث الـ store بالبيانات الجديدة
         if (platform) useStore.getState().setPlatform(platform)
 
         const tenant = (platform?.tenants || []).find(
-          t => t.adminEmail?.toLowerCase() === em
+          t => t.adminEmail?.trim().toLowerCase() === em
         )
 
         if (tenant) {
@@ -113,22 +116,27 @@ export function useAuth() {
       }
 
       // ── 2. Cashier ────────────────────────────────────────
+      // الكاشير يحتاج يكون مسجل دخول (ولو مجهول) عشان يشوف الـ platform
+      await signInAnonymously(auth)
+      
       const hashed   = await hashPassword(password)
-      const platform = await fetchPlatform()
+      const platform = await fetchPlatform(false) || await fetchPlatform(true)
       if (platform) useStore.getState().setPlatform(platform)
 
       for (const t of (platform?.tenants || [])) {
         const found = (t.cashiers || []).find(c =>
-          c.email?.toLowerCase() === em &&
+          c.email?.trim().toLowerCase() === em &&
           c.passwordHash === hashed &&
           c.active !== false
         )
         if (found) {
-          if (t.status !== 'active') { setError('اشتراك الكافيه موقوف.'); return false }
-          if (t.subscriptionEnds && new Date(t.subscriptionEnds) < new Date()) {
-            setError('انتهى اشتراك الكافيه.'); return false
+          if (t.status !== 'active') { 
+            await fbSignOut(auth); setError('اشتراك الكافيه موقوف.'); return false 
           }
-          await signInAnonymously(auth)
+          if (t.subscriptionEnds && new Date(t.subscriptionEnds) < new Date()) {
+            await fbSignOut(auth); setError('انتهى اشتراك الكافيه.'); return false
+          }
+          // الـ Anonymous session دي هي اللي هنكمل بيها
           setCurrentUser({
             uid: found.id, email: em, role: 'cashier',
             cafeId: t.id, cafeName: t.name,
@@ -139,6 +147,8 @@ export function useAuth() {
         }
       }
 
+      // لو موصلش لكاشير، نخرج ونقول بيانات غلط
+      await fbSignOut(auth)
       setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.')
       return false
 
