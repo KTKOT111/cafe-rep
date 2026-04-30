@@ -66,9 +66,12 @@ export function useAuth() {
         firebaseCred = await signInWithEmailAndPassword(auth, em, password)
       } catch (authErr) {
         if (['auth/user-not-found','auth/invalid-credential','auth/wrong-password'].includes(authErr.code)) {
+          console.warn('Auth failed for Admin, falling back to cashier check:', authErr.code)
           firebaseCred = null
         } else {
-          throw authErr
+          setError(`خطأ في المصادقة: ${authErr.code}`)
+          setLoading(false)
+          return false
         }
       }
 
