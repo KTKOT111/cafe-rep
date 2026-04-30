@@ -94,10 +94,15 @@ export function useFirestore() {
   useEffect(() => {
     const unsub = subscribePlatform(
       (snap) => { if (snap.exists()) setPlatform(snap.data()) },
-      (err)  => console.error('Platform subscription error:', err)
+      (err)  => {
+        // Permission errors are expected when not logged in
+        if (err.code !== 'permission-denied') {
+          console.error('Platform subscription error:', err)
+        }
+      }
     )
     return unsub
-  }, [])
+  }, [currentUser?.uid]) // Re-subscribe when auth changes
 
   // ── Cafe subscription ─────────────────────────────────────
   useEffect(() => {

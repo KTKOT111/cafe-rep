@@ -110,9 +110,9 @@ export function useAuth() {
         }
 
         // Firebase Auth نجح بس مش في tenants كـ admin
-        // ممكن يكون كاشير عنده Firebase account بالغلط — ادور في الكاشيرين
         await fbSignOut(auth)
-        // fall through to cashier check below
+        setError('هذا الإيميل مسجل في النظام ولكن لم يتم ربطه بأي كافيه. تأكد من إضافته في صفحة السوبر أدمن.')
+        return false
       }
 
       // ── 2. Cashier ────────────────────────────────────────
