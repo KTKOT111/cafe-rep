@@ -62,11 +62,13 @@ export function useAuth() {
     try {
       // ── 1. جرب Firebase Auth (Owner + Admins) ─────────────
       let firebaseCred = null
+      let fbAuthError = null
       try {
         firebaseCred = await signInWithEmailAndPassword(auth, em, password)
       } catch (authErr) {
         if (['auth/user-not-found','auth/invalid-credential','auth/wrong-password'].includes(authErr.code)) {
           console.warn('Auth failed for Admin, falling back to cashier check:', authErr.code)
+          fbAuthError = authErr.code
           firebaseCred = null
         } else {
           setError(`خطأ في المصادقة: ${authErr.code}`)
@@ -152,7 +154,9 @@ export function useAuth() {
 
       // لو موصلش لكاشير، نخرج ونقول بيانات غلط
       await fbSignOut(auth)
-      setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.')
+      let finalMsg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.'
+      if (fbAuthError) finalMsg += ` (الكود: ${fbAuthError})`
+      setError(finalMsg)
       return false
 
     } catch (e) {
