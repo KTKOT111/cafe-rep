@@ -39,6 +39,13 @@ export default function Sidebar({ currentRoute, onNavigate, onClose }) {
   const lowStock = useStore(selectLowStock(50))
   const { expired } = useStore(selectExpiringProducts)
 
+  const currentTenant = (platform?.tenants || []).find(t => t.id === currentUser?.cafeId)
+
+  const filteredNav = NAV.filter(item => {
+    if (item.id === 'playstation') return currentTenant?.psEnabled
+    return true
+  })
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800">
       {/* Logo */}
@@ -61,7 +68,7 @@ export default function Sidebar({ currentRoute, onNavigate, onClose }) {
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto custom-scrollbar">
-        {NAV.map(item => {
+        {filteredNav.map(item => {
           const Icon  = item.icon
           const badge = item.id === 'inventory' && lowStock.length > 0 ? lowStock.length
                       : item.id === 'products'  && expired.length  > 0 ? expired.length

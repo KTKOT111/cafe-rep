@@ -182,8 +182,10 @@ function OffersPanel({ products }) {
 }
 
 export default function POSPage() {
-  const { products, offers, tables, isTaxEnabled, isServiceEnabled, activeTableOrders, currentUser, placeOrder, holdTable } = useStore()
+  const { products, offers, tables, isTaxEnabled, isServiceEnabled, activeTableOrders, currentUser, placeOrder, holdTable, platform } = useStore()
   const activeShift = useStore(s => s.shifts.find(sh => sh.status === 'open' && sh.cashierName === s.currentUser?.displayName))
+
+  const currentTenant = (platform?.tenants || []).find(t => t.id === currentUser?.cafeId)
 
   const [mode,         setMode]         = useState('takeaway')
   const [activeTable,  setActiveTable]  = useState(null)
@@ -272,7 +274,7 @@ export default function POSPage() {
     { id: 'dine_in',     label: 'صالة',       icon: <Armchair size={14} /> },
     { id: 'playstation', label: 'بلايستيشن',  icon: <Gamepad2 size={14} />, badge: activePsCount },
     { id: 'offers',      label: 'العروض',      icon: <Tag size={14} />,      badge: activeOffersCount },
-  ]
+  ].filter(t => t.id !== 'playstation' || currentTenant?.psEnabled)
 
   const CartPanel = () => (
     <div className="flex flex-col h-full">

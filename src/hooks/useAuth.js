@@ -158,6 +158,7 @@ export function useAuth() {
   // ── Logout ────────────────────────────────────────────────
   const logout = async () => {
     try { await fbSignOut(auth) } catch {}
+    useStore.getState().setCafeData({})
     setCurrentUser(null)
   }
 

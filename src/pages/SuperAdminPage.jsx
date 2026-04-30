@@ -15,7 +15,7 @@ export default function SuperAdminPage() {
 
   const openAdd = () => {
     setEditTenant(null)
-    setForm({ id: '', name: '', subscriptionEnds: '', adminEmail: '', status: 'active' })
+    setForm({ id: '', name: '', subscriptionEnds: '', adminEmail: '', status: 'active', psEnabled: false })
     setShowTenantModal(true)
   }
 
@@ -95,6 +95,7 @@ export default function SuperAdminPage() {
           { label: 'إيميل المدير' },
           { label: 'الكاشيرية', center: true },
           { label: 'انتهاء الاشتراك' },
+          { label: 'البلايستيشن', center: true },
           { label: 'الحالة', center: true },
           { label: 'تحكم', center: true }
         ]}
@@ -119,12 +120,24 @@ export default function SuperAdminPage() {
               </span>
             </td>
             <td className="p-4 text-center">
+              <Badge color={t.psEnabled ? 'indigo' : 'slate'}>
+                {t.psEnabled ? 'مفعل' : 'ملغى'}
+              </Badge>
+            </td>
+            <td className="p-4 text-center">
               <Badge color={t.status === 'active' ? 'emerald' : 'rose'}>
                 {t.status === 'active' ? 'نشط' : 'موقوف'}
               </Badge>
             </td>
             <td className="p-4 text-center">
               <div className="flex justify-center gap-2">
+                <button onClick={() => {
+                  const next = tenants.map(item => item.id === t.id ? { ...item, psEnabled: !item.psEnabled } : item)
+                  savePlatformField({ tenants: next })
+                }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${t.psEnabled ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {t.psEnabled ? 'إلغاء البلايستيشن' : 'تفعيل البلايستيشن'}
+                </button>
                 <button onClick={() => toggleStatus(t.id)}
                   className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 dark:text-white transition-colors">
                   {t.status === 'active' ? 'إيقاف' : 'تفعيل'}
@@ -156,6 +169,13 @@ export default function SuperAdminPage() {
             <Input label="إيميل المدير" required type="email" value={form.adminEmail || ''}
               onChange={e => setForm({ ...form, adminEmail: e.target.value })}
               placeholder="admin@cafe2.com" dir="ltr" />
+
+            <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+              <input type="checkbox" id="ps_enabled" checked={form.psEnabled}
+                onChange={e => setForm({ ...form, psEnabled: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <label htmlFor="ps_enabled" className="text-sm font-bold text-slate-700 dark:text-slate-200 cursor-pointer">تفعيل ميزة البلايستيشن لهذا الكافيه</label>
+            </div>
 
             {/* Info about cashiers */}
             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-3">

@@ -80,6 +80,9 @@ export default function App() {
       if (route === 'settings') return <SettingsPage />
       return <SuperAdminPage />
     }
+    const currentTenant = (platform?.tenants || []).find(t => t.id === currentUser?.cafeId)
+    const isPsEnabled   = currentTenant?.psEnabled
+
     switch (route) {
       case 'dashboard':   return <DashboardPage   onNavigate={setRoute} />
       case 'pos':         return <POSPage />
@@ -89,7 +92,7 @@ export default function App() {
       case 'products':    return <ProductsPage />
       case 'offers':      return <OffersPage />
       case 'tables':      return <TablesPage />
-      case 'playstation': return <PlayStationPage />
+      case 'playstation': return isPsEnabled ? <PlayStationPage /> : <DashboardPage onNavigate={setRoute} />
       case 'hr':          return <HRPage />
       case 'expenses':    return <ExpensesPage />
       case 'settings':    return <SettingsPage />

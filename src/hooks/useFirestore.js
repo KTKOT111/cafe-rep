@@ -58,10 +58,12 @@ export function useFirestore() {
         // (cashier sessions are anonymous and may expire)
         if (storeUser && storeUser.role !== 'cashier') {
           clearSession()
+          useStore.getState().setCafeData({})
           useStore.getState().setCurrentUser(null)
         } else if (storeUser?.role === 'cashier') {
           // Anonymous session expired — cashier must re-login
           clearSession()
+          useStore.getState().setCafeData({})
           useStore.getState().setCurrentUser(null)
         }
         return
@@ -111,13 +113,13 @@ export function useFirestore() {
           // Document doesn't exist yet — create it with current store data
           const { products, rawMaterials, employees, expenses, tables,
                   shifts, orders, activeTableOrders, offers, psDevices,
-                  psSessions, isTaxEnabled } = useStore.getState()
+                  psSessions, isTaxEnabled, isServiceEnabled } = useStore.getState()
           const { saveCafe } = await import('../lib/firestore')
           try {
             await saveCafe(currentUser.cafeId, {
               products, rawMaterials, employees, expenses, tables,
               shifts, orders, activeTableOrders, offers, psDevices,
-              psSessions, isTaxEnabled
+              psSessions, isTaxEnabled, isServiceEnabled
             })
           } catch (e) {
             console.error('Failed to initialize cafe document:', e)
